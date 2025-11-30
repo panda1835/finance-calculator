@@ -5,7 +5,7 @@ import { FinanceInputForm, FormData } from '@/components/calculator/FinanceInput
 import { ResultsDisplay } from '@/components/calculator/ResultsDisplay';
 import { TimelineChart } from '@/components/calculator/TimelineChart';
 import { calculateFinancialIndependence, CalculationResults } from '@/lib/calculations';
-import { Calculator } from 'lucide-react';
+import Image from 'next/image'; 
 import { Button } from '@/components/ui/button';
 
 export type CalculatorMode = 'goal-based' | 'time-based';
@@ -58,11 +58,11 @@ export default function Home() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary rounded-lg">
-                <Calculator className="h-6 w-6 text-primary-foreground" />
+              <div className=" rounded-lg">
+                <Image src="/logo.png" alt="Calculator" width={40} height={40} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold tracking-tight">
+                <h1 className="text-lg font-bold tracking-tight">
                   Máy Tính Tự Do Tài Chính
                 </h1>
               </div>
