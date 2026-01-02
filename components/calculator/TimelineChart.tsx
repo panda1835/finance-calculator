@@ -15,7 +15,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import type { CategoricalChartState } from 'recharts/types/chart/types';
+
 
 interface TimelineChartProps {
   inputs: FinancialInputs;
@@ -51,7 +51,7 @@ export function TimelineChart({ inputs, mode, results }: TimelineChartProps) {
             <BarChart
               data={data}
               margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              onMouseMove={(state: CategoricalChartState) => {
+              onMouseMove={(state: any) => {
                 if (state?.activePayload && state.activePayload[0]) {
                   setHoveredValue(state.activePayload[0].value);
                 }
