@@ -15,10 +15,11 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
+import type { CategoricalChartState } from 'recharts/types/chart/types';
 
 interface TimelineChartProps {
   inputs: FinancialInputs;
-  mode: 'goal-based' | 'time-based';
+  mode: 'goal-based' | 'time-based' | 'contribution-based';
   results?: CalculationResults;
 }
 
@@ -30,6 +31,8 @@ export function TimelineChart({ inputs, mode, results }: TimelineChartProps) {
     targetValue = results?.calculatedFINumber 
       ? results.calculatedFINumber 
       : inputs.monthlyExpenses * 12 * 25;
+  } else if (mode === 'contribution-based') {
+    targetValue = results?.targetAtCompletion || results?.inflationAdjustedFINumber || inputs.targetFINumber;
   }
 
   const [hoveredValue, setHoveredValue] = useState<number | null>(null);
@@ -48,8 +51,8 @@ export function TimelineChart({ inputs, mode, results }: TimelineChartProps) {
             <BarChart
               data={data}
               margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              onMouseMove={(state: any) => {
-                if (state.activePayload && state.activePayload[0]) {
+              onMouseMove={(state: CategoricalChartState) => {
+                if (state?.activePayload && state.activePayload[0]) {
                   setHoveredValue(state.activePayload[0].value);
                 }
               }}

@@ -5,8 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { HelpCircle } from 'lucide-react';
-import { formatCurrency, formatPercentage } from '@/lib/formatters';
+import { HelpCircle, X } from 'lucide-react';
 
 export interface FormData {
   currentIncome: number;
@@ -25,7 +24,7 @@ export interface FormData {
 interface FinanceInputFormProps {
   data: FormData;
   onChange: (data: FormData) => void;
-  mode: 'goal-based' | 'time-based';
+  mode: 'goal-based' | 'time-based' | 'contribution-based';
 }
 
 interface InputFieldProps {
@@ -56,6 +55,7 @@ function InputField({ id, label, value, onChange, type = 'number', tooltip, requ
   useEffect(() => {
     if (document.activeElement !== document.getElementById(id)) {
       if (type === 'percentage') {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setDisplayValue((value * 100).toFixed(1));
       } else {
         setDisplayValue(formatWithCommas(value.toString()));
@@ -91,6 +91,12 @@ function InputField({ id, label, value, onChange, type = 'number', tooltip, requ
 
   const prefix = type === 'currency' ? '' : '';
   const suffix = type === 'percentage' ? '%' : '';
+  const hasValue = displayValue.length > 0;
+
+  const handleClear = () => {
+    setDisplayValue('');
+    onChange(0);
+  };
 
   return (
     <div className="space-y-2">
@@ -124,14 +130,24 @@ function InputField({ id, label, value, onChange, type = 'number', tooltip, requ
           value={displayValue}
           onChange={handleChange}
           onBlur={handleBlur}
-          className={`${prefix ? 'pl-7' : ''} ${suffix ? 'pr-8' : ''}`}
+          className={`${prefix ? 'pl-7' : ''} ${suffix ? 'pr-16' : 'pr-12'}`}
           required={required}
         />
         {suffix && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+          <span className="absolute right-12 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
             {suffix}
           </span>
         )}
+        <button
+          type="button"
+          onClick={handleClear}
+          aria-label={`Xóa ${label}`}
+          className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition ${
+            hasValue ? 'opacity-100' : 'opacity-40'
+          }`}
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
     </div>
   );
@@ -150,12 +166,11 @@ export function FinanceInputForm({ data, onChange, mode }: FinanceInputFormProps
           <CardDescription>
             {mode === 'goal-based' 
               ? 'Tình hình tài chính hiện tại của bạn'
-              : 'Thu nhập và thời gian mục tiêu của bạn'}
+              : 'Chi phí và nền tảng tài chính hiện tại của bạn'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Income field removed from all modes as requested */}
-          {mode === 'time-based' && (
+          {(mode === 'time-based' || mode === 'contribution-based') && (
             <InputField
               id="monthlyExpenses"
               label="Chi Phí Hàng Tháng"
@@ -168,19 +183,19 @@ export function FinanceInputForm({ data, onChange, mode }: FinanceInputFormProps
           
           <InputField
             id="currentSavings"
-            label="Tiền Tiết Kiệm Hiện Tại (Ngân Hàng)"
+            label="Tiền Tiết Kiệm (Ngân Hàng)"
             value={data.currentSavings}
             onChange={updateField('currentSavings')}
             type="currency"
-            tooltip="Số tiền mặt và tiết kiệm ngân hàng hiện có (hưởng lãi suất tiết kiệm)"
+            tooltip="Số tiền mặt và tiết kiệm ngân hàng hiện có"
           />
           <InputField
             id="currentInvestments"
-            label="Tiền Đầu Tư Hiện Tại (Cổ Phiếu/Bonds)"
+            label="Tiền Đầu Tư (Cổ Phiếu/Bonds)"
             value={data.currentInvestments || 0}
             onChange={updateField('currentInvestments')}
             type="currency"
-            tooltip="Số tiền đang đầu tư vào cổ phiếu, chứng khoán, v.v. (hưởng lợi nhuận đầu tư)"
+            tooltip="Số tiền đang đầu tư vào cổ phiếu, chứng khoán, v.v."
             required={false}
           />
         </CardContent>
@@ -189,12 +204,14 @@ export function FinanceInputForm({ data, onChange, mode }: FinanceInputFormProps
       <Card>
         <CardHeader>
           <CardTitle>
-            {mode === 'goal-based' ? 'Mục Tiêu Tài Chính' : 'Chiến Lược Tài Chính'}
+            {mode === 'goal-based' ? 'Mục Tiêu Tài Chính' : mode === 'time-based' ? 'Chiến Lược Tài Chính' : 'Mục Tiêu & Chiến Lược'}
           </CardTitle>
           <CardDescription>
             {mode === 'goal-based'
               ? 'Mục tiêu tự do tài chính của bạn'
-              : 'Thời gian và chiến lược của bạn'}
+              : mode === 'time-based'
+                ? 'Thời gian và chiến lược của bạn'
+                : 'Mục tiêu tài chính bạn muốn đạt và quỹ thời gian tham khảo'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -202,11 +219,11 @@ export function FinanceInputForm({ data, onChange, mode }: FinanceInputFormProps
             <>
               <InputField
                 id="targetFINumber"
-                label="Số Tiền Tự Do Tài Chính Mong Muốn (đã bao gồm lạm phát)"
+                label="Số Tiền Mong Muốn (Đã tính lạm phát)"
                 value={data.targetFINumber}
                 onChange={updateField('targetFINumber')}
                 type="currency"
-                tooltip="Tổng tài sản cần thiết để đạt tự do tài chính (theo giá trị tương lai)."
+                tooltip="Tổng tài sản cần thiết để đạt tự do tài chính."
               />
               <InputField
                 id="timeHorizon"
@@ -217,6 +234,24 @@ export function FinanceInputForm({ data, onChange, mode }: FinanceInputFormProps
                 tooltip="Số năm bạn muốn để đạt được tự do tài chính"
               />
             </>
+          ) : mode === 'contribution-based' ? (
+            <>
+              <InputField
+                id="targetFINumber"
+                label="Mục Tiêu Tự Do Tài Chính"
+                value={data.targetFINumber}
+                onChange={updateField('targetFINumber')}
+                type="currency"
+              />
+              <InputField
+                id="timeHorizon"
+                label="Số Năm Muốn Theo Dõi"
+                value={data.timeHorizon}
+                onChange={updateField('timeHorizon')}
+                type="number"
+                required={false}
+              />
+            </>
           ) : (
             <InputField
               id="timeHorizon"
@@ -224,42 +259,63 @@ export function FinanceInputForm({ data, onChange, mode }: FinanceInputFormProps
               value={data.timeHorizon}
               onChange={updateField('timeHorizon')}
               type="number"
-              tooltip="Số năm bạn có để đạt tự do tài chính"
             />
           )}
         </CardContent>
       </Card>
 
+      {mode === 'contribution-based' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Đóng Góp Hàng Tháng</CardTitle>
+            <CardDescription>Số tiền tích lũy định kỳ</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <InputField
+              id="monthlySavings"
+              label="Tiết Kiệm/Tháng"
+              value={data.monthlySavings || 0}
+              onChange={updateField('monthlySavings')}
+              type="currency"
+            />
+            <InputField
+              id="monthlyInvestment"
+              label="Đầu Tư/Tháng"
+              value={data.monthlyInvestment || 0}
+              onChange={updateField('monthlyInvestment')}
+              type="currency"
+            />
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Giả Định</CardTitle>
-          <CardDescription>Lợi nhuận và lạm phát dự kiến</CardDescription>
+          <CardDescription>Thị trường và nền kinh tế</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <InputField
             id="annualReturn"
-            label="Lợi Nhuận Đầu Tư Hàng Năm"
+            label="Lợi Nhuận Đầu Tư"
             value={data.annualReturn}
             onChange={updateField('annualReturn')}
             type="percentage"
-            tooltip="Lợi nhuận trung bình hàng năm dự kiến từ đầu tư. Trung bình thị trường chứng khoán lịch sử khoảng 7-10%."
           />
           <InputField
             id="savingsInterestRate"
-            label="Lãi Suất Tiết Kiệm Hàng Năm"
+            label="Lãi Suất Tiết Kiệm"
             value={data.savingsInterestRate || 0}
             onChange={updateField('savingsInterestRate')}
             type="percentage"
-            tooltip="Lãi suất tiết kiệm ngân hàng hàng năm. Thường khoảng 2-3%."
             required={false}
           />
           <InputField
             id="inflationRate"
-            label="Tỷ Lệ Lạm Phát Hàng Năm"
+            label="Tỷ Lệ Lạm Phát"
             value={data.inflationRate}
             onChange={updateField('inflationRate')}
             type="percentage"
-            tooltip="Tỷ lệ lạm phát trung bình hàng năm dự kiến. Trung bình lịch sử khoảng 2-3%."
           />
         </CardContent>
       </Card>

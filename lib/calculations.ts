@@ -30,6 +30,7 @@ export interface CalculationResults {
   suggestedMonthlyInvestment?: number;
   totalFutureSavings?: number;
   totalFutureInvestment?: number;
+  targetAtCompletion?: number;
 }
 
 /**
@@ -156,10 +157,14 @@ export function calculateTimelineToFI(
  */
 export function calculateFinancialIndependence(
   inputs: FinancialInputs,
-  mode: 'goal-based' | 'time-based' = 'goal-based'
+  mode: 'goal-based' | 'time-based' | 'contribution-based' = 'goal-based'
 ): CalculationResults {
   if (mode === 'time-based') {
     return calculateTimeBasedStrategy(inputs);
+  }
+
+  if (mode === 'contribution-based') {
+    return calculateContributionTimeline(inputs);
   }
   
   // Goal-based mode
@@ -230,10 +235,6 @@ export function calculateFinancialIndependence(
     totalFutureSavings,
     totalFutureInvestment,
   };
-}
-
-function calculateTimelineWithSplitAssets(inputs: FinancialInputs): { years: number; months: number; totalMonths: number } {
-  return { years: 0, months: 0, totalMonths: 0 }; 
 }
 
 /**
@@ -308,12 +309,101 @@ function calculateTimeBasedStrategy(inputs: FinancialInputs): CalculationResults
   };
 }
 
+function calculateContributionTimeline(inputs: FinancialInputs): CalculationResults {
+  const monthlySavingsContribution = inputs.monthlySavings || 0;
+  const monthlyInvestmentContribution = inputs.monthlyInvestment || 0;
+
+  const monthlySavingsRate = (inputs.savingsInterestRate || 0) / 12;
+  const monthlyInvestmentRate = inputs.annualReturn / 12;
+  const monthlyInflationRate = Math.pow(1 + inputs.inflationRate, 1 / 12) - 1;
+
+  const baseTarget = inputs.targetFINumber || inputs.monthlyExpenses * 12 * 25;
+
+  const projectPortfolio = (months: number) => {
+    const targetAtMonth = baseTarget * Math.pow(1 + monthlyInflationRate, months);
+
+    const savingsFutureValue =
+      monthlySavingsRate === 0
+        ? inputs.currentSavings + monthlySavingsContribution * months
+        : inputs.currentSavings * Math.pow(1 + monthlySavingsRate, months) +
+          monthlySavingsContribution * ((Math.pow(1 + monthlySavingsRate, months) - 1) / monthlySavingsRate);
+
+    const investmentsFutureValue =
+      monthlyInvestmentRate === 0
+        ? (inputs.currentInvestments || 0) + monthlyInvestmentContribution * months
+        : (inputs.currentInvestments || 0) * Math.pow(1 + monthlyInvestmentRate, months) +
+          monthlyInvestmentContribution * ((Math.pow(1 + monthlyInvestmentRate, months) - 1) / monthlyInvestmentRate);
+
+    return {
+      total: savingsFutureValue + investmentsFutureValue,
+      target: targetAtMonth,
+      savingsFutureValue,
+      investmentsFutureValue,
+    };
+  };
+
+  const startingPosition = projectPortfolio(0);
+  if (startingPosition.total >= startingPosition.target) {
+    return {
+      requiredMonthlySavings: monthlySavingsContribution + monthlyInvestmentContribution,
+      futureValueOfCurrentSavings: startingPosition.total,
+      inflationAdjustedFINumber: startingPosition.target,
+      yearsToFI: 0,
+      monthsToFI: 0,
+      totalMonthsToFI: 0,
+      suggestedMonthlySavings: monthlySavingsContribution,
+      suggestedMonthlyInvestment: monthlyInvestmentContribution,
+      totalFutureSavings: startingPosition.savingsFutureValue,
+      totalFutureInvestment: startingPosition.investmentsFutureValue,
+      targetAtCompletion: startingPosition.target,
+      baseFINumber: baseTarget,
+    };
+  }
+
+  let low = 0;
+  let high = 1200; // up to 100 years
+  let result = high;
+  let found = false;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    const projection = projectPortfolio(mid);
+
+    if (projection.total >= projection.target) {
+      found = true;
+      result = mid;
+      high = mid - 1;
+    } else {
+      low = mid + 1;
+    }
+  }
+
+  const completion = projectPortfolio(result);
+  const yearsToFI = Math.floor(result / 12);
+  const monthsToFI = result % 12;
+
+  return {
+    requiredMonthlySavings: monthlySavingsContribution + monthlyInvestmentContribution,
+    futureValueOfCurrentSavings: completion.total,
+    inflationAdjustedFINumber: completion.target,
+    yearsToFI: found ? yearsToFI : Infinity,
+    monthsToFI: found ? monthsToFI : 0,
+    totalMonthsToFI: found ? result : Infinity,
+    suggestedMonthlySavings: monthlySavingsContribution,
+    suggestedMonthlyInvestment: monthlyInvestmentContribution,
+    totalFutureSavings: completion.savingsFutureValue,
+    totalFutureInvestment: completion.investmentsFutureValue,
+    targetAtCompletion: completion.target,
+    baseFINumber: baseTarget,
+  };
+}
+
 /**
  * Generate year-by-year projection data for charting
  */
 export function generateTimelineData(
   inputs: FinancialInputs, 
-  mode: 'goal-based' | 'time-based' = 'goal-based',
+  mode: 'goal-based' | 'time-based' | 'contribution-based' = 'goal-based',
   results?: CalculationResults
 ): Array<{
   year: number;
@@ -345,8 +435,24 @@ export function generateTimelineData(
 
   let investedValue = inputs.currentInvestments || 0; // Amount that grows with annualReturn
   let savedValue = inputs.currentSavings; // Amount that grows with savingsInterestRate
+  const projectedYearsFromResults =
+    results && Number.isFinite(results.yearsToFI) ? Math.ceil(results.yearsToFI) : inputs.timeHorizon;
+  const yearsToProject =
+    mode === 'contribution-based' && results
+      ? Math.max(projectedYearsFromResults, inputs.timeHorizon)
+      : inputs.timeHorizon;
 
-  for (let year = 0; year <= inputs.timeHorizon; year++) {
+  if (mode === 'contribution-based') {
+    monthlySavingsContribution = inputs.monthlySavings || 0;
+    monthlyInvestmentContribution = inputs.monthlyInvestment || 0;
+    targetAmount = results?.baseFINumber || inputs.targetFINumber;
+  }
+
+  if (mode === 'time-based' && results?.baseFINumber) {
+    targetAmount = results.baseFINumber;
+  }
+
+  for (let year = 0; year <= yearsToProject; year++) {
     data.push({
       year,
       savings: Math.round(investedValue + savedValue),

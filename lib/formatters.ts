@@ -35,6 +35,10 @@ export function formatNumber(num: number, decimals: number = 0): string {
  * Format duration in years and months (Vietnamese)
  */
 export function formatDuration(years: number, months: number): string {
+  if (!Number.isFinite(years) || !Number.isFinite(months)) {
+    return 'Chưa đạt được trong phạm vi tính toán';
+  }
+
   const parts: string[] = [];
   
   if (years > 0) {

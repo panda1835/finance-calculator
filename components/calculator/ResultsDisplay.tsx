@@ -8,7 +8,7 @@ import { TrendingUp, Target, Clock, Wallet } from 'lucide-react';
 
 interface ResultsDisplayProps {
   results: CalculationResults;
-  mode: 'goal-based' | 'time-based';
+  mode: 'goal-based' | 'time-based' | 'contribution-based';
 }
 
 interface ResultCardProps {
@@ -43,7 +43,6 @@ function ResultCard({ icon, label, value, description, highlight = false }: Resu
 export function ResultsDisplay({ results, mode }: ResultsDisplayProps) {
   const {
     requiredMonthlySavings,
-    futureValueOfCurrentSavings,
     inflationAdjustedFINumber,
     yearsToFI,
     monthsToFI,
@@ -53,26 +52,34 @@ export function ResultsDisplay({ results, mode }: ResultsDisplayProps) {
     suggestedMonthlyInvestment,
     totalFutureSavings,
     totalFutureInvestment,
+    targetAtCompletion,
   } = results;
 
   const isAlreadyFI = totalMonthsToFI === 0;
   const timelineText = isAlreadyFI 
     ? 'Đã đạt được!' 
     : formatDuration(yearsToFI, monthsToFI);
+  const yearsLabelText = Number.isFinite(yearsToFI) ? `${yearsToFI}` : 'N/A';
+
+  const headingCopy =
+    mode === 'goal-based'
+      ? 'Kế Hoạch Tự Do Tài Chính Của Bạn'
+      : mode === 'time-based'
+        ? 'Chiến Lược Tài Chính Được Đề Xuất'
+        : 'Lộ Trình Dựa Trên Đóng Góp Hàng Tháng';
+
+  const subheadingCopy =
+    mode === 'goal-based'
+      ? 'Dựa trên thông tin của bạn, đây là những gì bạn cần để đạt được tự do tài chính'
+      : mode === 'time-based'
+        ? 'Dựa trên thu nhập và thời gian của bạn, đây là chiến lược được đề xuất'
+        : 'Dựa trên số tiền bạn đóng góp mỗi tháng, đây là thời gian và mục tiêu bạn sẽ đạt';
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>
-          {mode === 'goal-based' 
-            ? 'Kế Hoạch Tự Do Tài Chính Của Bạn'
-            : 'Chiến Lược Tài Chính Được Đề Xuất'}
-        </CardTitle>
-        <CardDescription>
-          {mode === 'goal-based'
-            ? 'Dựa trên thông tin của bạn, đây là những gì bạn cần để đạt được tự do tài chính'
-            : 'Dựa trên thu nhập và thời gian của bạn, đây là chiến lược được đề xuất'}
-        </CardDescription>
+        <CardTitle>{headingCopy}</CardTitle>
+        <CardDescription>{subheadingCopy}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {mode === 'time-based' && calculatedFINumber && (
@@ -81,6 +88,16 @@ export function ResultsDisplay({ results, mode }: ResultsDisplayProps) {
             label="Mục Tiêu Tự Do Tài Chính (Đã bao gồm lạm phát)"
             value={formatCurrency(calculatedFINumber)}
             description="Số tiền bạn cần đạt được trong tương lai để duy trì mức sống hiện tại"
+            highlight={true}
+          />
+        )}
+
+        {mode === 'contribution-based' && (
+          <ResultCard
+            icon={<Target className="h-5 w-5" />}
+            label="Mục Tiêu Tự Do Tài Chính (điều chỉnh theo lạm phát)"
+            value={formatCurrency(targetAtCompletion || inflationAdjustedFINumber)}
+            description="Mục tiêu di động tăng dần theo lạm phát cho tới khi đạt được"
             highlight={true}
           />
         )}
@@ -95,9 +112,18 @@ export function ResultsDisplay({ results, mode }: ResultsDisplayProps) {
           />
         )}
 
+        {mode === 'contribution-based' && (
+          <ResultCard
+            icon={<Wallet className="h-5 w-5" />}
+            label="Đóng Góp Hàng Tháng Hiện Tại"
+            value={formatCurrency(requiredMonthlySavings)}
+            description="Tổng số tiền tiết kiệm + đầu tư bạn đang lên kế hoạch mỗi tháng"
+            highlight={true}
+          />
+        )}
+
         <Separator />
 
-        {/* Strategy Breakdown - Shown for BOTH modes now */}
         <div className="grid gap-4 md:grid-cols-2">
           <ResultCard
             icon={<Wallet className="h-5 w-5" />}
@@ -113,8 +139,7 @@ export function ResultsDisplay({ results, mode }: ResultsDisplayProps) {
           />
         </div>
 
-        {/* Time to FI for Goal-Based Mode */}
-        {mode === 'goal-based' && (
+        {(mode === 'goal-based' || mode === 'contribution-based') && (
           <ResultCard
             icon={<Clock className="h-5 w-5" />}
             label="Thời Gian Đạt Tự Do Tài Chính"
@@ -123,25 +148,24 @@ export function ResultsDisplay({ results, mode }: ResultsDisplayProps) {
           />
         )}
 
-        {/* Total Future Assets */}
         <Separator />
         
         <div className="grid gap-4 md:grid-cols-2">
           <ResultCard
             icon={<Wallet className="h-5 w-5" />}
-            label={`Tổng Tiền Tiết Kiệm Sau ${yearsToFI} Năm`}
+            label={`Tổng Tiền Tiết Kiệm Sau ${yearsLabelText} Năm`}
             value={formatCurrency(totalFutureSavings || 0)}
             description="Tổng giá trị tiền tiết kiệm trong tương lai"
           />
           <ResultCard
             icon={<TrendingUp className="h-5 w-5" />}
-            label={`Tổng Tiền Đầu Tư Sau ${yearsToFI} Năm`}
+            label={`Tổng Tiền Đầu Tư Sau ${yearsLabelText} Năm`}
             value={formatCurrency(totalFutureInvestment || 0)}
             description="Tổng giá trị đầu tư trong tương lai"
           />
         </div>
 
-        {isAlreadyFI && mode === 'goal-based' && (
+        {isAlreadyFI && (mode === 'goal-based' || mode === 'contribution-based') && (
           <div className="p-4 bg-accent rounded-lg border border-primary">
             <p className="text-sm font-medium text-center">
               🎉 Chúc mừng! Bạn đã đạt được tự do tài chính!
@@ -151,7 +175,7 @@ export function ResultsDisplay({ results, mode }: ResultsDisplayProps) {
 
         <div className="p-4 bg-muted rounded-lg">
           <p className="text-sm text-muted-foreground">
-            <strong>Chiến lược:</strong> Phân bổ 70% vào đầu tư (lợi nhuận cao hơn) và 30% vào tiết kiệm (an toàn hơn) để cân bằng giữa tăng trưởng và bảo vệ vốn.
+            <strong>Chiến lược:</strong> Phân bổ 70% vào đầu tư và 30% vào tiết kiệm để cân bằng giữa tăng trưởng và bảo vệ vốn.
           </p>
         </div>
       </CardContent>
